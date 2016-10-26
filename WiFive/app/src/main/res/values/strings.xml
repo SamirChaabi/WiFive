@@ -1,0 +1,43 @@
+<resources>
+    <string name="app_name">WiFive</string>
+
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+
+    <string name="api_key">AIzaSyBayiZ03C-ar3oH1qUl5VCefPNV3L5fZ4U</string>
+    <string name="geocoding_api_key">AIzaSyAZSP34uCz-Yde67RTn-fzE_aq1nbnQ5bY</string>
+
+    <string name="add_wifi_error_title">Not able to add Wifi</string>
+    <string name="add_wifi_error_message">Unfortunately, we are not able to add the desired Wifi.
+        Please try again later</string>
+    <string name="add_wifi_title">Add Wifi</string>
+    <string name="wifi_exists_title">Existing Wifi</string>
+    <string name="wifi_exists_message">Wifi already exits in Wifive</string>
+    <string name="wait_title">Please wait ...</string>
+    <string name="wait_message">Fetching Wifi data ...</string>
+    <string name="allow">Re-try</string>
+    <string name="deny">Deny</string>
+    <string name="add">Add</string>
+    <string name="cancel">Cancel</string>
+    <string name="close">Close</string>
+    <string name="password_hint">Password</string>
+    <string name="password">Password:</string>
+    <string name="password_not_required">Password not required</string>
+    <string name="fragment_error_message">Not able to detect a connection to a Wifi, please check your connection.</string>
+    <string name="enter_password">Please enter a valid password</string>
+    <string name="ok_button">OK</string>
+    <string name="rating">Rating:</string>
+
+    <string name="user_ratings_node">userRatings</string>
+
+    <string name="user_rating_bundle_key">UserRatingBundleKey</string>
+    <string name="user_rating_map_bundle_key">UserRatingMapBundleKey</string>
+    <string name="access_location_message">We use your location to help you find the closest free WiFi.</string>
+    <string name="access_location_title">Let WiFive access your location?</string>
+
+    <string name="facebook_app_id">547496412117638</string>
+    <string name="title_activity_offline_areas">OfflineAreas</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+</resources>
