@@ -99,6 +99,15 @@ public class MarkerDialog extends android.support.v4.app.DialogFragment {
         }
     }
 
+    public static MarkerDialog newInstance() {
+        
+        Bundle args = new Bundle();
+        
+        MarkerDialog fragment = new MarkerDialog();
+        fragment.setArguments(args);
+        return fragment;
+    }
+
     public void ratingbarListener(final WifiWrapper wifiWrapper){
         final Firebase mRef = new WiFive().getmRef();
         RatingBar ratingBar = (RatingBar) markerDialog.findViewById(R.id.ratingBar);

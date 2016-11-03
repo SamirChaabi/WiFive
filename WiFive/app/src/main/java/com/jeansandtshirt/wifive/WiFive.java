@@ -14,12 +14,15 @@ import android.content.res.ColorStateList;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.FragmentActivity;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
@@ -34,11 +37,15 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.Toast;
+import android.support.v4.app.FragmentActivity;
 
 import com.firebase.client.DataSnapshot;
 import com.firebase.client.Firebase;
 import com.firebase.client.FirebaseError;
+import com.firebase.client.Query;
 import com.firebase.client.ValueEventListener;
+import com.google.android.gms.appindexing.Action;
+import com.google.android.gms.appindexing.AppIndex;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
@@ -57,9 +64,9 @@ public class WiFive extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener,
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener{
+        LocationListener, OnMapReadyCallback{
 
-    //SupportMapFragment mapFragment;
+    SupportMapFragment mapFragment;
 
     WiFiveFirebase firebase;
 
@@ -77,7 +84,11 @@ public class WiFive extends AppCompatActivity
 
     public static Marker selectedMarker;
 
-    //GoogleMap mMap;
+    public GoogleMap mMap;
+
+    android.support.v4.app.FragmentManager fragmentManager;
+    public FragmentTransaction fragmentTransaction;
+    public android.support.v4.app.Fragment currentFragment;
 
     public FloatingActionButton fab;
 
@@ -88,12 +99,19 @@ public class WiFive extends AppCompatActivity
     public static Location mLastLocation;
 
     LocationHandler permissionCheck = new LocationHandler();
+    /**
+     * ATTENTION: This was auto-generated to implement the App Indexing API.
+     * See https://g.co/AppIndexing/AndroidStudio for more information.
+     */
+    private GoogleApiClient client;
 
-    public Activity getActivity(){
+    public Activity getActivity() {
         return activity;
     }
 
-    public Marker getSelectedMarker() { return selectedMarker; }
+    public Marker getSelectedMarker() {
+        return selectedMarker;
+    }
 
     protected synchronized void buildGoogleApiClient() {
         Toast.makeText(this, "buildGoogleApiClient", Toast.LENGTH_SHORT).show();
@@ -104,17 +122,50 @@ public class WiFive extends AppCompatActivity
                 .build();
     }
 
-    public void showWifisOnMap(){
+    public void changeFragment(android.support.v4.app.Fragment newFragment){
+
+        if (fragmentManager == null){
+            fragmentManager = getSupportFragmentManager();
+            fragmentTransaction = fragmentManager.beginTransaction();
+        }
+        else
+            fragmentTransaction = fragmentManager.beginTransaction();
+
+        if(fragmentManager.findFragmentByTag(newFragment.getTag()) != null) {
+            fragmentTransaction.show(fragmentManager.findFragmentByTag(newFragment.getTag())).
+                    hide(fragmentManager.findFragmentByTag(currentFragment.getTag()));
+        }
+        else {
+            if(currentFragment == null)
+                fragmentTransaction.add(R.id.fragment_container, newFragment, newFragment.toString());
+            else
+                fragmentTransaction.add(R.id.fragment_container, newFragment, newFragment.toString()).hide(fragmentManager.findFragmentByTag(currentFragment.getTag()));
+        }
+        fragmentTransaction.commit();
+        currentFragment = newFragment;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
+    public void showWifisOnMap() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
             LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
             mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-            firebase.showWifiAtLocation(mRef, mainFragment.mMap, new LocationHandler().getCity(getActivity(), mLastLocation));
+            firebase.showWifiAtLocation(mRef, mMap, new LocationHandler().getCity(getActivity(), mLastLocation));
         }
     }
 
-    public void tempMeth(String key){
-        com.firebase.client.Query query = mRef.orderByKey().equalTo(key);
+    public void tempMeth(String key) {
+        Query query = mRef.orderByKey().equalTo(key);
         query.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
@@ -124,19 +175,20 @@ public class WiFive extends AppCompatActivity
                 LinkedHashMap userRatingsMap = getLinkedHashMap(dataSnapshot);
                 String deviceID = Settings.Secure.getString(getActivity().getContentResolver(), Settings.Secure.ANDROID_ID);
                 Integer userRating = userRatingsMap != null && userRatingsMap.get(deviceID) != null ? ((Integer) userRatingsMap.get(deviceID)) : 0;
-                try{
+                try {
                     Bundle bundle = new Bundle();
                     bundle.putFloat(URKey, userRating.floatValue());
                     bundle.putSerializable(URMKey, userRatingsMap);
-                    android.support.v4.app.DialogFragment newFragment = new MarkerDialog();
+
+                    android.support.v4.app.DialogFragment markerDialogFragment = new MarkerDialog();
                     //newFragment.setArguments(bundle);
-                    newFragment.show(getSupportFragmentManager(), "MarkerDialog");
+
+                    //markerDialogFragment.show(((WiFive) getActivity()).getSupportFragmentManager(), "MarkerDialog");
 
                     //new MarkerDialog().CreateMarkerDialog(userRating.floatValue(), userRatingsMap);
 
                     //new GetUserData().getProgressDialog().dismiss();
-                }
-                catch (Exception e){
+                } catch (Exception e) {
                     Log.d("Exception: ", e.getMessage().toString());
                 }
             }
@@ -150,16 +202,13 @@ public class WiFive extends AppCompatActivity
 
     @Override
     public void onConnected(@Nullable Bundle bundle) {
-        Toast.makeText(this,"onConnected", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "onConnected", Toast.LENGTH_SHORT).show();
 
         mLocationRequest = new LocationRequest();
         mLocationRequest.setInterval(1000);
         mLocationRequest.setFastestInterval(1000);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
         //mLocationRequest.setSmallestDisplacement(0.5F);
-
-        //TODO: FIX BELOW
-        //new MainFragment().showWifisOnMap();
         showWifisOnMap();
     }
 
@@ -186,12 +235,44 @@ public class WiFive extends AppCompatActivity
     protected void onStart() {
         mGoogleApiClient.connect();
         super.onStart();
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client.connect();
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        Action viewAction = Action.newAction(
+                Action.TYPE_VIEW, // TODO: choose an action type.
+                "WiFive Page", // TODO: Define a title for the content shown.
+                // TODO: If you have web page content that matches this app activity's content,
+                // make sure this auto-generated web page URL is correct.
+                // Otherwise, set the URL to null.
+                Uri.parse("http://host/path"),
+                // TODO: Make sure this auto-generated app URL is correct.
+                Uri.parse("android-app://com.jeansandtshirt.wifive/http/host/path")
+        );
+        AppIndex.AppIndexApi.start(client, viewAction);
     }
 
     @Override
     protected void onStop() {
         mGoogleApiClient.disconnect();
         super.onStop();
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        Action viewAction = Action.newAction(
+                Action.TYPE_VIEW, // TODO: choose an action type.
+                "WiFive Page", // TODO: Define a title for the content shown.
+                // TODO: If you have web page content that matches this app activity's content,
+                // make sure this auto-generated web page URL is correct.
+                // Otherwise, set the URL to null.
+                Uri.parse("http://host/path"),
+                // TODO: Make sure this auto-generated app URL is correct.
+                Uri.parse("android-app://com.jeansandtshirt.wifive/http/host/path")
+        );
+        AppIndex.AppIndexApi.end(client, viewAction);
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client.disconnect();
     }
 
     @Override
@@ -208,7 +289,7 @@ public class WiFive extends AppCompatActivity
         // Create an instance of GoogleAPIClient.
         buildGoogleApiClient();
 
-        //mapFragment = SupportMapFragment.newInstance();
+        mapFragment = SupportMapFragment.newInstance();
 
         String WiFiSSID = new PhysicalWiFiData().getWifiName(this);
 
@@ -225,7 +306,7 @@ public class WiFive extends AppCompatActivity
         navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        //mapFragment.getMapAsync(this);
+        mapFragment.getMapAsync(this);
 
         //TODO: Margin for frame layout in landscape
 
@@ -233,13 +314,14 @@ public class WiFive extends AppCompatActivity
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                //tempMeth("-KUD0RbtsEDcmaPRWVW7");
                 SQLiteDatabaseHelper sqLiteDatabase = new SQLiteDatabaseHelper(getActivity().getApplicationContext());
                 //boolean test = sqLiteDatabase.insertData("FDKLF243", "SSID", "pass", "MAC", "devID", 0.0, 0.0, "cityName", "userRating");
                 //sqLiteDatabase.getData();
 
-                if(new PhysicalWiFiData().isConnected(getApplicationContext()) && ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_FINE_LOCATION)
-                        == PackageManager.PERMISSION_GRANTED){
-                    com.firebase.client.Query query = mRef.orderByChild("MAC").equalTo(new PhysicalWiFiData().getMAC(getApplicationContext()));
+                if (new PhysicalWiFiData().isConnected(getApplicationContext()) && ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_FINE_LOCATION)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    Query query = mRef.orderByChild("MAC").equalTo(new PhysicalWiFiData().getMAC(getApplicationContext()));
                     final ProgressDialog progressDialog = ProgressDialog.show(getActivity(),
                             getApplicationContext().getString(R.string.wait_title),
                             getApplicationContext().getString(R.string.wait_message),
@@ -248,38 +330,42 @@ public class WiFive extends AppCompatActivity
                     query.addListenerForSingleValueEvent(new ValueEventListener() {
                         @Override
                         public void onDataChange(DataSnapshot dataSnapshot) {
-                            if (dataSnapshot.getValue() != null){
+                            if (dataSnapshot.getValue() != null) {
                                 progressDialog.dismiss();
                                 android.support.v4.app.DialogFragment newFragment = new WifiAlreadyExistsDialog();
                                 newFragment.show(getSupportFragmentManager(), "WifiAlreadyExistsDialog");
-                            }
-                            else{
+                            } else {
                                 progressDialog.dismiss();
                                 android.support.v4.app.DialogFragment newFragment = new AddNewWifiDialog();
                                 newFragment.show(getSupportFragmentManager(), "AddNewWifiDialog");
                             }
                         }
+
                         @Override
                         public void onCancelled(FirebaseError firebaseError) {
 
                         }
                     });
-                }
-                else{
+                } else {
                     android.support.v4.app.DialogFragment newFragment = new WifiNotConnectedDialog();
                     newFragment.show(getSupportFragmentManager(), "WifiNotConnectedDialog");
                 }
             }
         });
 
-        android.support.v4.app.FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
+        FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
 
         MainFragment mainFragment = new MainFragment();
 
         fragmentTransaction.add(R.id.fragment_container, mainFragment);
         fragmentTransaction.addToBackStack(null);
 
+        mainFragment.setSupportMapFragment(mapFragment);
+
         fragmentTransaction.commit();
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
     }
 
     @Override
@@ -292,11 +378,12 @@ public class WiFive extends AppCompatActivity
         }
     }
 
-    /*@Override
+    @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
         permissionCheck.checkPermissions(this, mMap, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
+
         final String URKey = getApplicationContext().getString(R.string.user_rating_bundle_key);
         final String URMKey = getApplicationContext().getString(R.string.user_rating_map_bundle_key);
         mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
@@ -310,15 +397,15 @@ public class WiFive extends AppCompatActivity
                     public void onDataChange(DataSnapshot dataSnapshot) {
                         LinkedHashMap userRatingsMap = getLinkedHashMap(dataSnapshot);
                         String deviceID = Settings.Secure.getString(getActivity().getContentResolver(), Settings.Secure.ANDROID_ID);
-                        Integer userRating = userRatingsMap != null ? ((Integer) userRatingsMap.get(deviceID)) : 0;
+                        Integer userRating = userRatingsMap != null ? ((Integer) userRatingsMap.get(deviceID) == null ? 0 : (Integer) userRatingsMap.get(deviceID)) : 0;
                         try{
                             Bundle bundle = new Bundle();
                             bundle.putFloat(URKey, userRating.floatValue());
                             bundle.putSerializable(URMKey, userRatingsMap);
                             //TODO: UNCOMMENT WHEN READY
-                            //DialogFragment newFragment = new MarkerDialog();
-                            //newFragment.setArguments(bundle);
-                            //newFragment.show(getFragmentManager(), "MarkerDialog");
+                            android.support.v4.app.DialogFragment newFragment = new MarkerDialog();
+                            newFragment.setArguments(bundle);
+                            newFragment.show(getSupportFragmentManager(), "MarkerDialog");
 
                             //new MarkerDialog().CreateMarkerDialog(userRating.floatValue(), userRatingsMap);
 
@@ -337,11 +424,11 @@ public class WiFive extends AppCompatActivity
                 return true;
             }
         });
-    }*/
+    }
 
-    public LinkedHashMap getLinkedHashMap(DataSnapshot dataSnapshot){
+    public LinkedHashMap getLinkedHashMap(DataSnapshot dataSnapshot) {
         Object wifi = dataSnapshot.getValue(HashMap.class).values().toArray()[0];
-        LinkedHashMap userRatingsMap = (LinkedHashMap)((LinkedHashMap) wifi).get("userRatings");
+        LinkedHashMap userRatingsMap = (LinkedHashMap) ((LinkedHashMap) wifi).get("userRatings");
 
         return userRatingsMap;
     }
@@ -351,8 +438,7 @@ public class WiFive extends AppCompatActivity
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
             case MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION: {
                 // If request is cancelled, the result arrays are empty.
@@ -362,14 +448,13 @@ public class WiFive extends AppCompatActivity
                     // contacts-related task you need to do.
 
                     if (ActivityCompat.checkSelfPermission(this,
-                            android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                        MainFragment mainFragment = new MainFragment();
-                        mainFragment.mMap.setMyLocationEnabled(true);
-                        mainFragment.showWifisOnMap();
+                            Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        mMap.setMyLocationEnabled(true);
+                        showWifisOnMap();
                         //mMap.setMyLocationEnabled(true);
                         //showWifisOnMap();
                     }
-                } else if(ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)){
+                } else if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
 
                     // permission denied! Disable the
                     // functionality that depends on this permission.
@@ -383,7 +468,7 @@ public class WiFive extends AppCompatActivity
                     builder.setPositiveButton(getApplicationContext().getString(R.string.allow), new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
                             ActivityCompat.requestPermissions(getActivity(),
-                                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+                                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                                     MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
                             // User clicked Re-Try button
                         }
@@ -417,7 +502,7 @@ public class WiFive extends AppCompatActivity
     @SuppressWarnings("StatementWithEmptyBody")
     @Override
     public boolean onNavigationItemSelected(MenuItem item) {
-        android.support.v4.app.FragmentManager sfm = getSupportFragmentManager();
+        FragmentManager sfm = getSupportFragmentManager();
         // Handle navigation view item clicks here.
 
         int id = item.getItemId();
@@ -433,7 +518,7 @@ public class WiFive extends AppCompatActivity
             else{
                 sfm.beginTransaction().show(mapFragment).commit();
             }*/
-            android.support.v4.app.FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
+            FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
 
             fragmentTransaction.replace(R.id.fragment_container, mainFragment);
             fragmentTransaction.addToBackStack(null);
@@ -445,7 +530,7 @@ public class WiFive extends AppCompatActivity
 
         } else if (id == R.id.nav_gallery) {
             OfflineAreaSettings fragment = new OfflineAreaSettings();
-            android.support.v4.app.FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
+            FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
             fab.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(getApplicationContext(), R.color.colorPrimaryDark)));
             fragmentTransaction.replace(R.id.fragment_container, offlineAreaSettings);
             fragmentTransaction.addToBackStack(null);

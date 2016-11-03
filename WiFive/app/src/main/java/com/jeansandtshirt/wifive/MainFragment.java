@@ -3,7 +3,7 @@ package com.jeansandtshirt.wifive;
 import android.*;
 import android.Manifest;
 import android.app.AlertDialog;
-import android.app.DialogFragment;
+import android.support.v4.app.DialogFragment;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -17,6 +17,8 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentActivity;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
@@ -48,19 +50,12 @@ import java.util.zip.Inflater;
  * A simple {@link Fragment} subclass.
  *
  */
-public class MainFragment extends Fragment implements
-        NavigationView.OnNavigationItemSelectedListener, OnMapReadyCallback
+public class MainFragment extends Fragment
         {
-
-    private GoogleApiClient mGoogleApiClient;
-
-    LocationHandler permissionCheck = new LocationHandler();
-    private static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 0;
 
     public Firebase mRef = new Firebase("https://wifivedata.firebaseio.com/");
 
     public static Marker selectedMarker;
-    public static GoogleMap mMap;
 
     SupportMapFragment mapFragment;
 
@@ -70,22 +65,21 @@ public class MainFragment extends Fragment implements
         // Required empty public constructor
     }
 
+    public void setSupportMapFragment(SupportMapFragment mapFragment){
+        this.mapFragment = mapFragment;
+    }
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
         firebase = new WiFiveFirebase();
 
-        //mGoogleApiClient.connect();
-
-        mapFragment = SupportMapFragment.newInstance();
-
-        mapFragment.getMapAsync(this);
         android.support.v4.app.FragmentManager sfm = getFragmentManager();
 
         sfm.beginTransaction().add(R.id.wifive_map, mapFragment).commit();
 
-        View rootView = inflater.inflate(R.layout.fragment_main, container, false);
+        //View rootView = inflater.inflate(R.layout.fragment_main, container, false);
 
         // Inflate the layout for this fragment
         return inflater.inflate(R.layout.fragment_main, container, false);
@@ -109,134 +103,10 @@ public class MainFragment extends Fragment implements
         //mGoogleApiClient.disconnect();
     }
 
-    @Override
-    public void onMapReady(GoogleMap googleMap) {
-        mMap = googleMap;
-
-        permissionCheck.checkPermissions(getActivity(), mMap, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
-        final String URKey = getContext().getString(R.string.user_rating_bundle_key);
-        final String URMKey = getContext().getString(R.string.user_rating_map_bundle_key);
-        mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
-            @Override
-            public boolean onMarkerClick(Marker marker) {
-                selectedMarker = marker;
-                String firebaseKey = new WiFiveFirebase().getEventMarkerMap().get(marker).getFirebaseKey();
-                com.firebase.client.Query query = mRef.orderByKey().equalTo(firebaseKey);
-                new WiFive().tempMeth(firebaseKey);
-                /*query.addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(DataSnapshot dataSnapshot) {
-                        LinkedHashMap userRatingsMap = getLinkedHashMap(dataSnapshot);
-                        String deviceID = Settings.Secure.getString(getActivity().getContentResolver(), Settings.Secure.ANDROID_ID);
-                        Integer userRating = userRatingsMap != null ? ((Integer) userRatingsMap.get(deviceID)) : 0;
-                        try{
-                            Bundle bundle = new Bundle();
-                            bundle.putFloat(URKey, userRating.floatValue());
-                            bundle.putSerializable(URMKey, userRatingsMap);
-                            android.support.v4.app.DialogFragment newFragment = new MarkerDialog();
-                            //newFragment.setArguments(bundle);
-                            newFragment.show(getFragmentManager(), "MarkerDialog");
-
-                            //new MarkerDialog().CreateMarkerDialog(userRating.floatValue(), userRatingsMap);
-
-                            //new GetUserData().getProgressDialog().dismiss();
-                        }
-                        catch (Exception e){
-                            Log.d("Exception: ", e.getMessage().toString());
-                        }
-
-                    }
-                    @Override
-                    public void onCancelled(FirebaseError firebaseError) {
-
-                    }
-                });*/
-                return true;
-            }
-        });
-    }
-
-    @Override
-    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-        return false;
-    }
-
-    /*protected synchronized void buildGoogleApiClient() {
-    Toast.makeText(getContext(), "buildGoogleApiClient", Toast.LENGTH_SHORT).show();
-    mGoogleApiClient = new GoogleApiClient.Builder(getContext())
-            .addConnectionCallbacks(this)
-            .addOnConnectionFailedListener(this)
-            .addApi(LocationServices.API)
-            .build();
-    }*/
-
-    public void showWifisOnMap(){
-        if (ActivityCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            /*LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-            mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-            firebase.showWifiAtLocation(mRef, mMap, new LocationHandler().getCity(getActivity(), mLastLocation));*/
-        }
-    }
-
     public LinkedHashMap getLinkedHashMap(DataSnapshot dataSnapshot){
         Object wifi = dataSnapshot.getValue(HashMap.class).values().toArray()[0];
         LinkedHashMap userRatingsMap = (LinkedHashMap)((LinkedHashMap) wifi).get("userRatings");
 
         return userRatingsMap;
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION: {
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // permission was granted! Do the
-                    // contacts-related task you need to do.
-
-                    if (ActivityCompat.checkSelfPermission(getContext(),
-                            android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                        mMap.setMyLocationEnabled(true);
-                        showWifisOnMap();
-                    }
-                } else if(ActivityCompat.shouldShowRequestPermissionRationale(getActivity(), Manifest.permission.ACCESS_FINE_LOCATION)){
-
-                    // permission denied! Disable the
-                    // functionality that depends on this permission.
-                    // 1. Instantiate an AlertDialog.Builder with its constructor
-                    AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-
-                    // 2. Chain together various setter methods to set the dialog characteristics
-                    builder.setMessage(getContext().getString(R.string.access_location_message))
-                            .setTitle(getContext().getString(R.string.access_location_title));
-
-                    builder.setPositiveButton(getContext().getString(R.string.allow), new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int id) {
-                            ActivityCompat.requestPermissions(getActivity(),
-                                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
-                                    MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
-                            // User clicked Re-Try button
-                        }
-                    });
-                    builder.setNegativeButton(getContext().getString(R.string.deny), new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int id) {
-                            // User cancelled the dialog
-                        }
-                    });
-
-                    // 3. Get the AlertDialog from create()
-                    AlertDialog dialog = builder.create();
-
-                    dialog.show();
-                }
-                return;
-            }
-
-            // other 'case' lines to check for other
-            // permissions this app might request
-        }
     }
 }
