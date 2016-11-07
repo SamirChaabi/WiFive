@@ -59,8 +59,6 @@ public class MainFragment extends Fragment
 
     SupportMapFragment mapFragment;
 
-    WiFiveFirebase firebase;
-
     public MainFragment() {
         // Required empty public constructor
     }
@@ -72,8 +70,6 @@ public class MainFragment extends Fragment
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-
-        firebase = new WiFiveFirebase();
 
         android.support.v4.app.FragmentManager sfm = getFragmentManager();
 
